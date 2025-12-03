@@ -1,6 +1,4 @@
-Here’s a **GitHub-ready version** of your AI Firewall project in a single folder structure, with certificates removed, banlist cleared, and `.gitignore` added. You can just drag and drop this folder into GitHub manually.
 
----
 
 **Folder Structure:**
 
