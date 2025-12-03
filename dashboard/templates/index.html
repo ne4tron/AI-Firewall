@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Firewall Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+        table { border-collapse: collapse; width: 100%; background: #fff; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even){background-color: #f2f2f2;}
+    </style>
+</head>
+<body>
+    <h1>AI Firewall Dashboard</h1>
+    {% if logs %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Feature 1</th>
+                <th>Feature 2</th>
+                <th>Feature 3</th>
+                <th>Feature 4</th>
+                <th>Feature 5</th>
+                <th>RandomForest Prediction</th>
+                <th>IsolationForest Prediction</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ log.feature1 }}</td>
+                <td>{{ log.feature2 }}</td>
+                <td>{{ log.feature3 }}</td>
+                <td>{{ log.feature4 }}</td>
+                <td>{{ log.feature5 }}</td>
+                <td>{{ log.RandomForest_prediction }}</td>
+                <td>{{ log.IsolationForest_prediction }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No logs yet. Use the <code>/sample_data</code> POST endpoint to add predictions.</p>
+    {% endif %}
+</body>
+</html>
+
