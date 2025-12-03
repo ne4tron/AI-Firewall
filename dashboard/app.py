@@ -1,75 +1,53 @@
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import HTMLResponse
-from jose import jwt, JWTError
-from datetime import datetime, timedelta
-import json, os, subprocess
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+from typing import List
 
-
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-BAN_FILE = 'firewall/banlist.json'
-
-
+# FastAPI app
 app = FastAPI(title="AI Firewall Dashboard")
 
+# Static files (CSS/JS)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-def create_access_token(data: dict):
-to_encode = data.copy()
-expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-to_encode.update({"exp": expire})
-return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+# Templates
+templates = Jinja2Templates(directory="templates")
 
+# In-memory log storage
+logs: List[dict] = []
 
-@app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-if form_data.username != "admin" or form_data.password != "password":
-raise HTTPException(status_code=400, detail="Incorrect credentials")
-access_token = create_access_token({"sub": form_data.username})
-return {"access_token": access_token, "token_type": "bearer"}
+# Sample ML prediction logic
+class SampleData(BaseModel):
+    feature1: float
+    feature2: float
+    feature3: float
+    feature4: float
+    feature5: float
 
+def mock_random_forest(data: SampleData):
+    # Dummy rule: sum of features > 2 -> 1 else 0
+    return 1 if sum(data.dict().values()) > 2 else 0
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-try:
-payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-username = payload.get("sub")
-if username != "admin":
-raise HTTPException(status_code=401, detail="Invalid user")
-return username
-except JWTError:
-raise HTTPException(status_code=401, detail="Invalid token")
+def mock_isolation_forest(data: SampleData):
+    # Dummy rule: any feature < 0.1 -> anomaly
+    return "Anomaly" if any(v < 0.1 for v in data.dict().values()) else "Normal"
 
-
+# Root dashboard
 @app.get("/", response_class=HTMLResponse)
-def index(user: str = Depends(get_current_user)):
-html = "<html><body><h1>AI Firewall Dashboard</h1>"
-html += "<p>Visit /api/banlist for JSON banlist</p></body></html>"
-return HTMLResponse(content=html)
+async def dashboard(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "logs": logs})
 
+# Endpoint for adding sample data
+@app.post("/sample_data")
+async def add_sample_data(data: SampleData):
+    rf_pred = mock_random_forest(data)
+    iso_pred = mock_isolation_forest(data)
+    log_entry = {
+        **data.dict(),
+        "RandomForest_prediction": rf_pred,
+        "IsolationForest_prediction": iso_pred
+    }
+    logs.append(log_entry)
+    return JSONResponse(log_entry)
 
-@app.get("/api/banlist")
-def banlist(user: str = Depends(get_current_user)):
-if not os.path.exists(BAN_FILE):
-return {}
-with open(BAN_FILE, 'r') as f:
-data = json.load(f)
-now = datetime.utcnow().timestamp()
-active = {ip: info for ip, info in data.items() if info.get('expires',0) > now}
-return active
-
-
-@app.post("/api/unblock/{ip}")
-def unblock(ip: str, user: str = Depends(get_current_user)):
-if not os.path.exists(BAN_FILE):
-raise HTTPException(status_code=404, detail="Banlist not found")
-with open(BAN_FILE, 'r') as f:
-data = json.load(f)
-if ip not in data:
-raise HTTPException(status_code=404, detail="IP not in banlist")
-subprocess.run(['iptables','-D','INPUT','-s',ip,'-j','DROP'], check=False)
-del data[ip]
-with open(BAN_FILE, 'w') as f:
-json.dump(data, f, indent=2)
-return {"status":"unblocked","ip":ip}

@@ -1,0 +1,50 @@
+# dashboard/app.py
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import joblib
+import numpy as np
+import os
+
+app = FastAPI(title="AI Firewall Dashboard")
+
+# Load models
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "../model")
+RANDOM_FOREST_MODEL = os.path.join(MODEL_DIR, "random_forest.joblib")
+ISOLATION_FOREST_MODEL = os.path.join(MODEL_DIR, "isolation_forest.joblib")
+
+try:
+    rf_model = joblib.load(RANDOM_FOREST_MODEL)
+except FileNotFoundError:
+    raise FileNotFoundError(f"RandomForest model not found at {RANDOM_FOREST_MODEL}")
+
+try:
+    iso_model = joblib.load(ISOLATION_FOREST_MODEL)
+except FileNotFoundError:
+    raise FileNotFoundError(f"IsolationForest model not found at {ISOLATION_FOREST_MODEL}")
+
+# Pydantic model for request body
+class SampleData(BaseModel):
+    features: list[float]
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to AI Firewall Dashboard!"}
+
+@app.post("/predict")
+def predict(data: SampleData):
+    try:
+        # Convert input to numpy array
+        sample = np.array(data.features).reshape(1, -1)
+        # RandomForest prediction
+        rf_pred = rf_model.predict(sample)
+        # IsolationForest anomaly detection
+        iso_pred = iso_model.predict(sample)
+        return {
+            "random_forest_prediction": int(rf_pred[0]),
+            "isolation_forest_anomaly": int(iso_pred[0])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+if __name__ == "__main__":
+    import uvico
