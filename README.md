@@ -1,209 +1,137 @@
+# AI Firewall
 
+## Overview
 
-**Folder Structure:**
+**AI Firewall** is a smart, AI-driven security system designed to detect anomalies and potential threats in real-time. It leverages **machine learning models** to monitor network traffic, system logs, and user activity, providing proactive defense against attacks such as:
 
-```
-ai-firewall-secure/
-│
-├── .gitignore
-├── README.md
-├── requirements.txt
-├── model/
-│   └── train.py
-├── dashboard/
-│   └── app.py
-├── firewall/
-│   └── engine.py
-└── scripts/
-    └── setup_iptables.sh
-```
+- Brute-force login attempts
+- Malicious API requests
+- Abnormal system behavior
+- Suspicious network traffic patterns
+
+This tool combines predictive models with a web-based dashboard for **real-time monitoring, logging, and response actions**.
 
 ---
-
-**.gitignore**
-
-```
-venv/
-*.pyc
-__pycache__/
-certs/
-firewall/banlist.json
-```
-
----
-
-**README.md**
-
-```
-# AI Firewall Secure Version
-
-This is an advanced AI-driven firewall with ensemble ML model, JWT authentication dashboard, and HTTPS-ready setup.
 
 ## Features
-- Ensemble ML model (IsolationForest + RandomForest)
-- FastAPI dashboard with JWT authentication
-- HTTPS-ready structure
-- NFQUEUE firewall engine
 
-## Setup
-1. Install Python dependencies: `pip install -r requirements.txt`
-2. Train the model: `python model/train.py`
-3. Run firewall engine: `sudo python firewall/engine.py --model model/model.joblib`
-4. Start dashboard: `uvicorn dashboard.app:app --reload --host 0.0.0.0 --port 8443`
-
-> NOTE: Do not upload private certificates or keys to GitHub. This project is for lab/demo use.
-```
+- **Real-Time Monitoring:** Logs incoming events and predicts anomalies instantly.
+- **Machine Learning Models:**  
+  - **RandomForest:** Classifies normal vs suspicious events.  
+  - **IsolationForest:** Detects anomalies in feature patterns.
+- **Dashboard:** Visualizes logs, feature data, and predictions in real-time.
+- **Proactive Security Actions:** Alerts admins, blocks malicious IPs, throttles suspicious requests.
+- **REST API Endpoint:** `/sample_data` for submitting features to get predictions.
 
 ---
 
-**requirements.txt**
+## Installation
 
-```
-scikit-learn==1.3.2
-pandas==2.2.2
-numpy==1.26.4
-joblib==1.3.2
-scapy==2.5.1
-netfilterqueue==1.0.8
-uvicorn==0.23.1
-fastapi==0.99.3
-python-multipart==0.0.6
-psutil==5.9.5
-schedule==1.2.0
-python-jose==3.3.0
-passlib[bcrypt]==1.7.4
-```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ne4tron/AI-Firewall.git
+   cd AI-Firewall
+Create a Python virtual environment and activate it:
 
----
+bash
+Copy code
+python3 -m venv venv
+source venv/bin/activate
+Install required dependencies:
 
-**model/train.py**
+bash
+Copy code
+pip install -r requirements.txt
+Ensure you have SSL certificates:
 
-```python
-from sklearn.ensemble import IsolationForest, RandomForestClassifier, VotingClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-import joblib
-import pandas as pd
-import numpy as np
-import os
+certs/cert.pem
 
-def generate_synthetic(n_normal=1000, n_anom=50):
-    rng = np.random.RandomState(42)
-    normal = rng.normal(0, 1, (n_normal,6))
-    anom = rng.normal(4, 1.5, (n_anom,6))
-    X = np.vstack([normal, anom])
-    y = np.hstack([np.zeros(n_normal), np.ones(n_anom)])
-    cols = ['pkt_len','tcp_flags','src_port','dst_port','flow_bytes','pkt_per_sec']
-    return pd.DataFrame(X, columns=cols), y
+certs/key.pem
 
-def train(output_path='model/model.joblib'):
-    X, y = generate_synthetic()
-    iso = IsolationForest(contamination=0.02, random_state=42)
-    rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    ensemble = VotingClassifier([('iso', iso), ('rf', rf)], voting='soft')
-    pipeline = Pipeline([('scaler', StandardScaler()), ('model', ensemble)])
-    pipeline.fit(X, y)
-    os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
-    joblib.dump(pipeline, output_path)
-    print(f"Saved ensemble model to {output_path}")
+Usage
+Start the dashboard with:
 
-if __name__ == "__main__":
-    train()
-```
+bash
+Copy code
+uvicorn dashboard.app:app --reload --host 0.0.0.0 --port 8443 \
+    --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
+Access the Dashboard
+Open a browser and navigate to:
+https://127.0.0.1:8443 or https://<your-server-ip>:8443
 
----
+The dashboard displays logs, features, and predictions in real-time.
 
-**dashboard/app.py**
+Sample POST Request to /sample_data
+bash
+Copy code
+curl -k -X POST https://127.0.0.1:8443/sample_data \
+-H "Content-Type: application/json" \
+-d '{"feature1":0.45,"feature2":0.07,"feature3":0.53,"feature4":0.85,"feature5":0.05}'
+Sample response:
 
-```python
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import HTMLResponse
-from jose import jwt, JWTError
-from datetime import datetime, timedelta
-import json, os, subprocess
+json
+Copy code
+{
+  "feature1": 0.45,
+  "feature2": 0.07,
+  "feature3": 0.53,
+  "feature4": 0.85,
+  "feature5": 0.05,
+  "RandomForest_prediction": 0,
+  "IsolationForest_prediction": "Anomaly"
+}
+Real-World Use Cases
+Brute-Force Attack Prevention
 
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-BAN_FILE = 'firewall/banlist.json'
+Detect multiple failed logins from one IP.
 
-app = FastAPI(title="AI Firewall Dashboard")
+Block IP or trigger CAPTCHA automatically.
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+Malicious API Requests
 
-@app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    if form_data.username != "admin" or form_data.password != "password":
-        raise HTTPException(status_code=400, detail="Incorrect credentials")
-    access_token = create_access_token({"sub": form_data.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+Identify abnormal payloads or frequency.
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if username != "admin":
-            raise HTTPException(status_code=401, detail="Invalid user")
-        return username
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+Alert admins and block requests before server compromise.
 
-@app.get("/", response_class=HTMLResponse)
-def index(user: str = Depends(get_current_user)):
-    html = "<html><body><h1>AI Firewall Dashboard</h1>"
-    html += "<p>Visit /api/banlist for JSON banlist</p></body></html>"
-    return HTMLResponse(content=html)
+System Behavior Monitoring
 
-@app.get("/api/banlist")
-def banlist(user: str = Depends(get_current_user)):
-    if not os.path.exists(BAN_FILE):
-        return {}
-    with open(BAN_FILE, 'r') as f:
-        data = json.load(f)
-    now = datetime.utcnow().timestamp()
-    active = {ip: info for ip, info in data.items() if info.get('expires',0) > now}
-    return active
+Monitor CPU, memory, or API patterns.
 
-@app.post("/api/unblock/{ip}")
-def unblock(ip: str, user: str = Depends(get_current_user)):
-    if not os.path.exists(BAN_FILE):
-        raise HTTPException(status_code=404, detail="Banlist not found")
-    with open(BAN_FILE, 'r') as f:
-        data = json.load(f)
-    if ip not in data:
-        raise HTTPException(status_code=404, detail="IP not in banlist")
-    subprocess.run(['iptables','-D','INPUT','-s',ip,'-j','DROP'], check=False)
-    del data[ip]
-    with open(BAN_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
-    return {"status":"unblocked","ip":ip}
-```
+Detect unusual spikes or abnormal activities in real-time.
+
+Benefits
+Proactive defense instead of reactive blocking
+
+Real-time visibility into system and network activity
+
+AI-driven anomaly detection reduces false positives
+
+Easy integration into existing networks or cloud setups
+
+Contributing
+Fork the repository
+
+Create a feature branch (git checkout -b feature-name)
+
+Commit your changes (git commit -m "Description")
+
+Push to the branch (git push origin feature-name)
+
+Open a Pull Request
+
+License
+This project is licensed under the MIT License.
+
+pgsql
+Copy code
 
 ---
 
-**firewall/engine.py**
+If you want, I can also **write the git commands to commit this in one branch and push it to GitHub** without requiring a password (using a Personal Access Token), so your updates go live immediately.  
 
-```python
-# Placeholder engine file
-print("Firewall engine script placeholder. Replace with your NFQUEUE code.")
-```
+Do you want me to do that next?
 
----
 
-**scripts/setup_iptables.sh**
 
-```bash
-#!/bin/bash
-# Placeholder setup script
-echo "Setup iptables rules here (root required)."
-```
 
----
 
-This folder is ready to **drag and drop to GitHub manually**, without including private keys or sensitive files.
