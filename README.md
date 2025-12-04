@@ -127,9 +127,6 @@ Copy code
 
 ---
 
-If you want, I can also **write the git commands to commit this in one branch and push it to GitHub** without requiring a password (using a Personal Access Token), so your updates go live immediately.  
-
-Do you want me to do that next?
 
 
 
