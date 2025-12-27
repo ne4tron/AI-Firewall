@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Firewall Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>AI Firewall Dashboard</h1>
+    
+    <div id="logs">
+        <h2>Feature Predictions</h2>
+        <button onclick="getPrediction()">Run Sample Prediction</button>
+        <pre id="prediction">Waiting for prediction...</pre>
+    </div>
+
+    <script>
+        async function getPrediction() {
+            const response = await fetch('/sample_data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    feature1: 0.45,
+                    feature2: 0.07,
+                    feature3: 0.53,
+                    feature4: 0.85,
+                    feature5: 0.05
+                })
+            });
+            const data = await response.json();
+            document.getElementById('prediction').innerText = JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>
+
